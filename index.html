@@ -249,11 +249,16 @@ nav.tabs .add span.plus svg{width:26px;height:26px}
 
 <script>
 (function(){
+// 지출 분류: 식비 = 혼자 먹는 것(배달·편의점·혼자 커피), 외식 = 같이 먹는 것 전부(사 주기·N빵·카페 쏘기)
+const OLD_EXPENSE_CATS=[
+    {n:'월세',g:'fixed'},{n:'주거',g:'fixed'},{n:'통신',g:'fixed'},{n:'보험',g:'fixed'},{n:'구독',g:'fixed'},
+    {n:'식비',g:'var'},{n:'카페',g:'var'},{n:'교통비',g:'var'},{n:'생활',g:'var'},{n:'의류',g:'var'},{n:'의료',g:'var'},
+    {n:'미용',g:'var'},{n:'문화여가',g:'var'},{n:'자기계발',g:'var'},{n:'선물/용돈',g:'var'},{n:'경조사',g:'var'},{n:'되팔기용',g:'var'},{n:'기타',g:'var'}];
 const DEF={
   expenseCats:[
     {n:'월세',g:'fixed'},{n:'주거',g:'fixed'},{n:'통신',g:'fixed'},{n:'보험',g:'fixed'},{n:'구독',g:'fixed'},
-    {n:'식비',g:'var'},{n:'카페',g:'var'},{n:'교통비',g:'var'},{n:'생활',g:'var'},{n:'의류',g:'var'},{n:'의료',g:'var'},
-    {n:'미용',g:'var'},{n:'문화여가',g:'var'},{n:'자기계발',g:'var'},{n:'선물/용돈',g:'var'},{n:'경조사',g:'var'},{n:'되팔기용',g:'var'},{n:'기타',g:'var'}],
+    {n:'식비',g:'var'},{n:'외식',g:'var'},{n:'교통비',g:'var'},{n:'생활',g:'var'},{n:'의류·미용',g:'var'},{n:'문화여가',g:'var'},
+    {n:'의료',g:'var'},{n:'선물·경조사',g:'var'},{n:'자기계발',g:'var'},{n:'되팔기용',g:'var'},{n:'기타',g:'var'}],
   incomeCats:['급여','부수입','상여금','정산','캐시백','이자/배당','환급금','기타'],
   methods:[{n:'체크카드',k:'check'},{n:'현금',k:'cash'},{n:'계좌이체',k:'bank'}]
 };
@@ -361,6 +366,14 @@ function applyLoad(d){
   pending.forEach(p=>{const k=COLS[p.col];S[k]=S[k].filter(x=>x.id!==p.id);if(p.obj)S[k].push(p.obj);});
   saveCache();
 }
+// 시트에 예전 기본 분류가 손대지 않은 채 저장돼 있으면 새 기본 분류로 한 번 바꿔요 (직접 고친 목록은 그대로 둬요)
+function migrateCats(){
+  const key=a=>JSON.stringify((a||[]).map(c=>[c.n,c.g]));
+  if(key(S.cfg.expenseCats)!==key(OLD_EXPENSE_CATS))return;
+  S.cfg={...S.cfg,expenseCats:DEF.expenseCats};
+  saveCache();render();
+  enqueue(()=>API.call('api_setCfg',{expenseCats:S.cfg.expenseCats,incomeCats:S.cfg.incomeCats,methods:S.cfg.methods})).catch(()=>{});
+}
 let lastLoad=0;
 async function reload(){
   S.stale=true;render();
@@ -376,6 +389,7 @@ async function boot(){
   try{
     const d=await enqueue(()=>API.call('api_load'));
     applyLoad(d);S.status='ok';S.db=true;S.loaded=S.fixedLoaded=S.accLoaded=true;lastLoad=Date.now();
+    migrateCats();
   }catch(e){
     if(e&&e.code==='BAD_KEY'){S.status='setup';S.setupUrl=CONF.url;S.setupErr=errMsg(e);}
     else if(cached)toast('최신 기록을 불러오지 못했어요. 저장해 둔 기록을 보여 줘요.');
