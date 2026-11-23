@@ -145,6 +145,13 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .mini span{display:inline-flex;align-items:center;gap:5px}
 .mini b{color:var(--ink);font-weight:600}
 .qa{display:flex;flex-direction:column;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.fhead{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;border:0;background:transparent;padding:0;text-align:left;color:inherit}
+.fhead h2{margin:0}
+.chev svg{width:18px;height:18px;color:var(--muted);display:block}
+.chev.open svg{transform:rotate(90deg)}
+.fbody{margin-top:10px}
+.syncdot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;margin-left:2px}
+@media (prefers-reduced-motion: no-preference){.syncdot{animation:pulse 1s ease-in-out infinite alternate}@keyframes pulse{from{opacity:.25}to{opacity:1}}}
 .qagroup{display:flex;flex-direction:column;gap:6px}
 .qagroup+.qagroup{padding-top:10px;border-top:1px dashed var(--line)}
 .qalab{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.02em}
@@ -255,8 +262,9 @@ const ACC_KINDS=['적금','예금','청약','ISA','연금','주식','파킹통�
 const CASHBACK='캐시백';
 const now=new Date();
 let lastM='';try{lastM=localStorage.getItem('lastMethod')||'';}catch(e){}
+let fixedOpen0=false;try{fixedOpen0=localStorage.getItem('fixedOpen')==='1';}catch(e){}
 function rememberMethod(m){try{localStorage.setItem('lastMethod',m||'');}catch(e){}}
-const S={db:null,dl:null,status:'loading',y:now.getFullYear(),m:now.getMonth()+1,tab:'list',
+const S={fixedOpen:fixedOpen0,stale:false,db:null,dl:null,status:'loading',y:now.getFullYear(),m:now.getMonth()+1,tab:'list',
   txs:[],savings:[],accounts:[],fixed:[],cfg:DEF,filter:'expense',open:{},subY:null,unsubY:null,loaded:false,
   fixedLoaded:false,accLoaded:false,qa:{type:'expense',amount:'',cat:'',accountId:'',method:lastM,memo:'',date:''},sheetUrl:'',qaMore:false};
 let F=null; // sheet form state
@@ -320,31 +328,60 @@ function enqueue(fn){const p=chain.then(fn);chain=p.catch(()=>{});return p;}
 function newId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function savings(){return S.txs.filter(t=>t.type==='saving');}
 function saveErr(e){toast('저장하지 못했어요. 인터넷 연결을 확인해 주세요.');reload();}
+// 이 기기에 마지막으로 불러온 기록을 저장해 두고, 다음에 열 때 먼저 보여 줘요(서버 응답을 기다리지 않음)
+const CACHE_KEY='gagyebu-cache';
+function saveCache(){try{localStorage.setItem(CACHE_KEY,JSON.stringify({tx:S.txs,accounts:S.accounts,fixed:S.fixed,cfg:S.cfg,sheetUrl:S.sheetUrl}));}catch(e){}}
+let cacheTimer=null;
+function saveCacheSoon(){clearTimeout(cacheTimer);cacheTimer=setTimeout(saveCache,300);}
+// 아직 서버에 도착하지 않은 변경. 새로 불러온 기록 위에 다시 얹어서 화면에서 사라지지 않게 해요
+const pending=new Map();
 function put(col,obj){
   const k=COLS[col],arr=S[k],i=arr.findIndex(x=>x.id===obj.id);
   if(i>=0)arr[i]=obj;else arr.push(obj);
-  render();
-  return enqueue(()=>API.call('api_put',col,obj)).catch(saveErr);
+  const pk=col+':'+obj.id,mark={col,id:obj.id,obj};pending.set(pk,mark);
+  render();saveCacheSoon();
+  return enqueue(()=>API.call('api_put',col,obj))
+    .then(()=>{if(pending.get(pk)===mark)pending.delete(pk);})
+    .catch(e=>{if(pending.get(pk)===mark)pending.delete(pk);saveErr(e);});
 }
 function patch(col,id,fields){const o=S[COLS[col]].find(x=>x.id===id);if(!o)return Promise.resolve();return put(col,{...o,...fields});}
-function del(col,id){S[COLS[col]]=S[COLS[col]].filter(x=>x.id!==id);render();return enqueue(()=>API.call('api_del',col,id)).catch(saveErr);}
+function del(col,id){
+  S[COLS[col]]=S[COLS[col]].filter(x=>x.id!==id);
+  const pk=col+':'+id,mark={col,id,obj:null};pending.set(pk,mark);
+  render();saveCacheSoon();
+  return enqueue(()=>API.call('api_del',col,id))
+    .then(()=>{if(pending.get(pk)===mark)pending.delete(pk);})
+    .catch(e=>{if(pending.get(pk)===mark)pending.delete(pk);saveErr(e);});
+}
 function applyLoad(d){
   S.txs=d.tx||[];S.accounts=d.accounts||[];S.fixed=d.fixed||[];
   const c=d.cfg||{};
   S.cfg={expenseCats:c.expenseCats||DEF.expenseCats,incomeCats:c.incomeCats||DEF.incomeCats,methods:c.methods||DEF.methods};
   S.sheetUrl=d.sheetUrl||'';
+  pending.forEach(p=>{const k=COLS[p.col];S[k]=S[k].filter(x=>x.id!==p.id);if(p.obj)S[k].push(p.obj);});
+  saveCache();
 }
 let lastLoad=0;
 async function reload(){
-  try{const d=await enqueue(()=>API.call('api_load'));applyLoad(d);S.status='ok';lastLoad=Date.now();}catch(e){S.status='error';}
-  render();
+  S.stale=true;render();
+  try{const d=await enqueue(()=>API.call('api_load'));applyLoad(d);S.status='ok';lastLoad=Date.now();}
+  catch(e){if(!S.db)S.status='error';else toast('최신 기록을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.');}
+  S.stale=false;render();
 }
 async function boot(){
   if(!CONF){S.status='setup';render();return;}
+  let cached=null;try{cached=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');}catch(e){cached=null;}
+  if(cached){applyLoad(cached);S.status='ok';S.db=true;S.stale=true;render();}   // 바로 보여 주기
   S.timer=setTimeout(()=>{if(S.status==='loading'){S.status='slow';render();}},10000);
-  try{const d=await API.call('api_load');applyLoad(d);S.status='ok';S.db=true;S.loaded=S.fixedLoaded=S.accLoaded=true;lastLoad=Date.now();}
-  catch(e){if(e&&e.code==='BAD_KEY'){S.status='setup';S.setupUrl=CONF.url;}else S.status='error';S.setupErr=errMsg(e);}
-  clearTimeout(S.timer);
+  try{
+    const d=await enqueue(()=>API.call('api_load'));
+    applyLoad(d);S.status='ok';S.db=true;S.loaded=S.fixedLoaded=S.accLoaded=true;lastLoad=Date.now();
+  }catch(e){
+    if(e&&e.code==='BAD_KEY'){S.status='setup';S.setupUrl=CONF.url;S.setupErr=errMsg(e);}
+    else if(cached)toast('최신 기록을 불러오지 못했어요. 저장해 둔 기록을 보여 줘요.');
+    else{S.status='error';S.setupErr=errMsg(e);}
+  }
+  S.stale=false;clearTimeout(S.timer);
   render();autoRecord();
 }
 // 폰에서 다른 앱 갔다가 돌아오면(1분 이상) PC에서 고친 내용까지 다시 불러와요
@@ -355,7 +392,7 @@ function header(){
   return `<header class="top">
     <div class="monthnav">
       <button class="iconbtn" data-act="mprev" aria-label="이전 달">${I.prev}</button>
-      <h1 class="num">${S.y}년 ${S.m}월</h1>
+      <h1 class="num">${S.y}년 ${S.m}월</h1>${S.stale?'<span class="syncdot" role="status" aria-label="최신 기록 불러오는 중" title="최신 기록 불러오는 중"></span>':''}
       <button class="iconbtn" data-act="mnext" aria-label="다음 달">${I.next}</button>
     </div>
     <button class="iconbtn" data-act="settings" aria-label="설정">${I.gear}</button>
@@ -514,7 +551,7 @@ function fixedCard(all){
     return `<div class="frow"><button class="fmain" data-act="editFixed" data-id="${f.id}"><span class="t1">${name}</span><span class="hint">${sub}</span></button><div class="fright"><span class="num" style="font-weight:600">${amt}</span>${st}</div></div>`;
   }).join('');
   const rest=[left?`남은 ${won(left)}원`:'',unknown?`금액 확인 ${unknown}개`:''].filter(Boolean).join(' + ');
-  return `<section class="card"><h2>고정비 <span class="sub">· ${items.length}개 중 ${paid}개 냄${rest?` · ${rest}`:''}</span></h2>${rows}<button class="btn" style="margin-top:12px" data-act="newFixed">＋ 고정비 등록</button></section>`;
+  return `<section class="card"><button class="fhead" data-act="toggleFixed" aria-expanded="${S.fixedOpen}"><h2>고정비 <span class="sub">· ${items.length}개 중 ${paid}개 냄${rest?` · ${rest}`:''}</span></h2><span class="chev ${S.fixedOpen?'open':''}">${I.next}</span></button>${S.fixedOpen?`<div class="fbody">${rows}<button class="btn" style="margin-top:12px" data-act="newFixed">＋ 고정비 등록</button></div>`:''}</section>`;
 }
 function freqCats(){
   const cnt={};S.txs.filter(t=>t.type==='expense').forEach(t=>cnt[t.cat]=(cnt[t.cat]||0)+1);
@@ -1018,9 +1055,20 @@ document.addEventListener('click',async e=>{
       const id=F.id;closeSheet();
       del('fixed',id);toast('지웠어요');
       break;}
+    case 'toggleFixed':
+      S.fixedOpen=!S.fixedOpen;try{localStorage.setItem('fixedOpen',S.fixedOpen?'1':'0');}catch(e){}
+      render();break;
     case 'payFixed':{
       const f=S.fixed.find(x=>x.id===el.dataset.id);if(!f)return;
       const isNow=S.y===now.getFullYear()&&S.m===now.getMonth()+1;
+      if(Number(f.amount)){
+        // 금액이 정해진 고정비는 바로 적기 (날짜는 오늘, 지난달을 보고 있으면 그달 예정일)
+        const date=isNow?today():fixedTx(f,S.y,S.m).date,p=date.slice(0,7);
+        put('tx',{id:`fx-${f.id}-${p}`,...fixedTx(f,S.y,S.m),date});
+        if((f.skip||[]).includes(p))patch('fixed',f.id,{skip:(f.skip||[]).filter(x=>x!==p)});
+        toast(`${f.name||f.cat} ${won(f.amount)}원 ${isNow?'오늘 ':''}냈어요 · 날짜가 다르면 ✓를 눌러 고치세요`);
+        break;
+      }
       F={mode:'payFixed',fid:f.id,amount:String(f.amount||''),method:f.method||'',date:isNow?today():fixedTx(f,S.y,S.m).date};
       renderSheet();break;}
     case 'pmethod':readPayInputs();F.method=F.method===el.dataset.v?'':el.dataset.v;renderSheet();break;
@@ -1096,7 +1144,7 @@ document.addEventListener('click',async e=>{
       break;}
     case 'disconnect':{
       if(F.arm!=='disconnect'){F.arm='disconnect';renderSheet();return;}
-      try{localStorage.removeItem(CONF_KEY);}catch(e){}
+      try{localStorage.removeItem(CONF_KEY);localStorage.removeItem(CACHE_KEY);}catch(e){}
       S.setupUrl=CONF&&CONF.url||'';CONF=null;closeSheet();
       S.status='setup';S.db=null;S.setupErr='';S.txs=[];S.accounts=[];S.fixed=[];render();
       break;}
