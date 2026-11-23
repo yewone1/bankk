@@ -538,6 +538,9 @@ function fixedCard(all){
   const items=[...S.fixed].sort((a,b)=>(Number(a.day)||0)-(Number(b.day)||0));
   if(!items.length)return `<section class="card"><h2>고정비</h2><p class="hint" style="font-size:14px">월세, 통신비, 보험처럼 매달 나가는 돈을 등록해 두면, 그 날짜가 지나면 이번 달 내역에 알아서 적혀요.</p><button class="btn" style="margin-top:10px" data-act="newFixed">＋ 고정비 등록</button></section>`;
   const p=ym(S.y,S.m);let paid=0,left=0,unknown=0;
+  // 정렬: 아직 안 낸 것(⏳) → 이번 달 건너뜀(⏭️) → 낸 것(✓), 각각 날짜 순
+  const rank=f=>fixedMatch(f,all)?2:(f.skip||[]).includes(p)?1:0;
+  items.sort((a,b)=>rank(a)-rank(b)||(Number(a.day)||0)-(Number(b.day)||0));
   const rows=items.map(f=>{
     const tx=fixedMatch(f,all),skipped=!tx&&(f.skip||[]).includes(p);
     const variable=!Number(f.amount);   // 금액을 비워 등록 = 매달 금액이 달라서 직접 확인
