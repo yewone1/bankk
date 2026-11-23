@@ -680,11 +680,11 @@ function viewSetup(){
   return `<div class="setup">
     <img src="icons/icon-192.png" alt="" width="64" height="64" style="border-radius:16px">
     <h1>돈의 흐름 가계부</h1>
-    <p class="hint" style="font-size:14px">구글 시트에 만든 가계부 서버와 연결해요. 이 폰에서 처음 한 번만 하면 돼요.</p>
+    <p class="hint" style="font-size:14px">구글 시트에 만든 가계부 서버와 연결해요. 이 기기에서 처음 한 번만 하면 돼요.</p>
     ${S.setupErr?`<div class="banner err">${esc(S.setupErr)}</div>`:''}
     <div class="field"><label for="c-url">서버 주소 (웹 앱 URL)</label><input class="input" id="c-url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.setupUrl||'')}"></div>
     <div class="field"><label for="c-key">비밀번호 (6자 이상)</label><input class="input" id="c-key" type="password" autocomplete="current-password"></div>
-    <p class="hint">처음 연결할 때 적은 비밀번호가 이 가계부의 비밀번호가 돼요. 다른 폰에서 연결할 때도 같은 비밀번호를 쓰세요.</p>
+    <p class="hint">처음 연결할 때 적은 비밀번호가 이 가계부의 비밀번호가 돼요. 노트북이나 다른 폰에서 연결할 때도 같은 비밀번호를 쓰세요.</p>
     <button class="btn primary block" data-act="connect" ${S.connecting?'disabled':''}>${S.connecting?'연결하는 중…':'연결'}</button>
   </div>`;
 }
@@ -866,13 +866,7 @@ function renderSheet(){
     <section class="card"><h2>지출 분류 · 고정비</h2><div class="setlist">${ec(fx)}</div><div class="addrow" style="margin-top:10px"><input class="input" id="s-fix" placeholder="새 고정비 분류"><button class="btn" data-act="addCat" data-g="fixed">추가</button></div></section>
     <section class="card"><h2>지출 분류 · 변동비</h2><div class="setlist">${ec(vr)}</div><div class="addrow" style="margin-top:10px"><input class="input" id="s-var" placeholder="새 변동비 분류"><button class="btn" data-act="addCat" data-g="var">추가</button></div></section>
     <section class="card"><h2>수입 분류</h2><div class="setlist">${setChips(c.incomeCats,'inc')}</div><div class="addrow" style="margin-top:10px"><input class="input" id="s-inc" placeholder="새 수입 분류"><button class="btn" data-act="addInc">추가</button></div></section>
-    <section class="card"><h2>구글 시트</h2><p class="hint" style="margin-bottom:10px">모든 내역은 구글 시트에 저장돼요. PC에서 시트를 열면 엑셀처럼 보이고, 파일 → 다운로드 → Microsoft Excel(.xlsx)로 PC에 저장할 수 있어요. 시트에서 직접 고친 내용은 새로고침하면 앱에 반영돼요.</p><div class="row2">${S.sheetUrl?`<a class="btn" style="text-align:center;text-decoration:none;color:inherit" href="${esc(S.sheetUrl)}" target="_blank" rel="noopener">시트 열기</a>`:'<span></span>'}<button class="btn" data-act="reload">새로고침</button></div><button class="btn danger block ${F.arm==='disconnect'?'armed':''}" style="margin-top:8px" data-act="disconnect">${F.arm==='disconnect'?'한 번 더 누르면 이 폰에서 연결을 끊어요':'이 폰에서 연결 끊기'}</button><p class="hint" style="margin-top:6px">연결을 끊어도 구글 시트의 기록은 그대로예요.</p></section>
-    <section class="card"><h2>데이터 정리</h2>
-      <p class="hint" style="margin-bottom:10px">예시 데이터는 미리 보기용으로 넣어 둔 내역과 통장이에요. 전부 지우면 내역, 통장, 분류 설정까지 처음 상태로 돌아가고 되돌릴 수 없어요.</p>
-      <div class="stack" style="gap:8px">
-        <button class="btn danger block ${F.arm==='wipeSample'?'armed':''}" data-act="wipeSample" ${F.busy?'disabled':''}>${F.arm==='wipeSample'?'한 번 더 누르면 예시 데이터를 지워요':'예시 데이터만 지우기'}</button>
-        <button class="btn danger block ${F.arm==='wipeAll'?'armed':''}" data-act="wipeAll" ${F.busy?'disabled':''}>${F.busy?'지우는 중…':(F.arm==='wipeAll'?'한 번 더 누르면 전부 지워져요':'모든 데이터 지우고 처음부터')}</button>
-      </div></section>`;
+    <section class="card"><h2>구글 시트</h2><p class="hint" style="margin-bottom:10px">모든 내역은 구글 시트에 저장돼요. PC에서 시트를 열면 엑셀처럼 보이고, 파일 → 다운로드 → Microsoft Excel(.xlsx)로 PC에 저장할 수 있어요. 시트에서 직접 고친 내용은 새로고침하면 앱에 반영돼요.</p><div class="row2">${S.sheetUrl?`<a class="btn" style="text-align:center;text-decoration:none;color:inherit" href="${esc(S.sheetUrl)}" target="_blank" rel="noopener">시트 열기</a>`:'<span></span>'}<button class="btn" data-act="reload">새로고침</button></div><button class="btn danger block ${F.arm==='disconnect'?'armed':''}" style="margin-top:8px" data-act="disconnect">${F.arm==='disconnect'?'한 번 더 누르면 이 기기에서 연결을 끊어요':'이 기기에서 연결 끊기'}</button><p class="hint" style="margin-top:6px">연결을 끊어도 구글 시트의 기록은 그대로예요.</p></section>`;
   }
   $('#sheetRoot').innerHTML=`<div class="backdrop" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true"><div class="in"><div class="grab"></div>${inner}</div></div>`;
 }
