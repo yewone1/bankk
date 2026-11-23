@@ -1,0 +1,17 @@
+{
+  "name": "돈의 흐름 가계부",
+  "short_name": "가계부",
+  "description": "수입·지출·저축을 적고 돈의 흐름을 보는 개인 가계부",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F1F4F3",
+  "theme_color": "#F1F4F3",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
