@@ -788,11 +788,9 @@ function viewSetup(){
   return `<div class="setup">
     <img src="icons/icon-192.png" alt="" width="64" height="64" style="border-radius:16px">
     <h1>돈의 흐름 가계부</h1>
-    <p class="hint" style="font-size:14px">구글 시트에 만든 가계부 서버와 연결해요. 이 기기에서 처음 한 번만 하면 돼요.</p>
     ${S.setupErr?`<div class="banner err">${esc(S.setupErr)}</div>`:''}
-    <div class="field"><label for="c-url">서버 주소 (웹 앱 URL)</label><input class="input" id="c-url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.setupUrl||'')}"></div>
-    <div class="field"><label for="c-key">비밀번호 (6자 이상)</label><input class="input" id="c-key" type="password" autocomplete="current-password"></div>
-    <p class="hint">처음 연결할 때 적은 비밀번호가 이 가계부의 비밀번호가 돼요. 노트북이나 다른 폰에서 연결할 때도 같은 비밀번호를 쓰세요.</p>
+    <div class="field"><label for="c-url">서버 주소</label><input class="input" id="c-url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" value="${esc(S.setupUrl||'')}"></div>
+    <div class="field"><label for="c-key">비밀번호</label><input class="input" id="c-key" type="password" autocomplete="current-password"></div>
     <button class="btn primary block" data-act="connect" ${S.connecting?'disabled':''}>${S.connecting?'연결하는 중…':'연결'}</button>
   </div>`;
 }
