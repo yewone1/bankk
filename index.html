@@ -254,9 +254,14 @@ const OLD_EXPENSE_CATS=[
     {n:'월세',g:'fixed'},{n:'주거',g:'fixed'},{n:'통신',g:'fixed'},{n:'보험',g:'fixed'},{n:'구독',g:'fixed'},
     {n:'식비',g:'var'},{n:'카페',g:'var'},{n:'교통비',g:'var'},{n:'생활',g:'var'},{n:'의류',g:'var'},{n:'의료',g:'var'},
     {n:'미용',g:'var'},{n:'문화여가',g:'var'},{n:'자기계발',g:'var'},{n:'선물/용돈',g:'var'},{n:'경조사',g:'var'},{n:'되팔기용',g:'var'},{n:'기타',g:'var'}];
+const OLD_EXPENSE_CATS_2=[
+    {n:'월세',g:'fixed'},{n:'주거',g:'fixed'},{n:'통신',g:'fixed'},{n:'보험',g:'fixed'},{n:'구독',g:'fixed'},
+    {n:'식비',g:'var'},{n:'외식',g:'var'},{n:'교통비',g:'var'},{n:'생활',g:'var'},{n:'의류·미용',g:'var'},{n:'문화여가',g:'var'},
+    {n:'의료',g:'var'},{n:'선물·경조사',g:'var'},{n:'자기계발',g:'var'},{n:'되팔기용',g:'var'},{n:'기타',g:'var'}];
+// 주거 = 월세·관리비·공과금(도시가스·전기·수도)까지 집에 드는 돈 전부
 const DEF={
   expenseCats:[
-    {n:'월세',g:'fixed'},{n:'주거',g:'fixed'},{n:'통신',g:'fixed'},{n:'보험',g:'fixed'},{n:'구독',g:'fixed'},
+    {n:'주거',g:'fixed'},{n:'통신',g:'fixed'},{n:'보험',g:'fixed'},{n:'구독',g:'fixed'},
     {n:'식비',g:'var'},{n:'외식',g:'var'},{n:'교통비',g:'var'},{n:'생활',g:'var'},{n:'의류·미용',g:'var'},{n:'문화여가',g:'var'},
     {n:'의료',g:'var'},{n:'선물·경조사',g:'var'},{n:'자기계발',g:'var'},{n:'되팔기용',g:'var'},{n:'기타',g:'var'}],
   incomeCats:['급여','부수입','상여금','정산','캐시백','이자/배당','환급금','기타'],
@@ -369,10 +374,17 @@ function applyLoad(d){
 // 시트에 예전 기본 분류가 손대지 않은 채 저장돼 있으면 새 기본 분류로 한 번 바꿔요 (직접 고친 목록은 그대로 둬요)
 function migrateCats(){
   const key=a=>JSON.stringify((a||[]).map(c=>[c.n,c.g]));
-  if(key(S.cfg.expenseCats)!==key(OLD_EXPENSE_CATS))return;
-  S.cfg={...S.cfg,expenseCats:DEF.expenseCats};
-  saveCache();render();
-  enqueue(()=>API.call('api_setCfg',{expenseCats:S.cfg.expenseCats,incomeCats:S.cfg.incomeCats,methods:S.cfg.methods})).catch(()=>{});
+  const k=key(S.cfg.expenseCats);
+  if(k===key(OLD_EXPENSE_CATS)||k===key(OLD_EXPENSE_CATS_2)){
+    S.cfg={...S.cfg,expenseCats:DEF.expenseCats};
+    saveCache();render();
+    enqueue(()=>API.call('api_setCfg',{expenseCats:S.cfg.expenseCats,incomeCats:S.cfg.incomeCats,methods:S.cfg.methods})).catch(()=>{});
+  }
+  // 분류 목록에 '월세'가 없으면, 이미 적힌 월세 고정비·내역도 '주거'로 옮겨요
+  if(!S.cfg.expenseCats.some(c=>c.n==='월세')){
+    S.fixed.filter(f=>f.cat==='월세').forEach(f=>patch('fixed',f.id,{cat:'주거'}));
+    S.txs.filter(t=>t.type==='expense'&&t.cat==='월세').forEach(t=>patch('tx',t.id,{cat:'주거'}));
+  }
 }
 let lastLoad=0;
 async function reload(){
