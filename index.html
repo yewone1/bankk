@@ -145,6 +145,9 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .mini span{display:inline-flex;align-items:center;gap:5px}
 .mini b{color:var(--ink);font-weight:600}
 .qa{display:flex;flex-direction:column;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.qagroup{display:flex;flex-direction:column;gap:6px}
+.qagroup+.qagroup{padding-top:10px;border-top:1px dashed var(--line)}
+.qalab{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.02em}
 .amount.sm{padding:8px 12px}
 .qarow{display:grid;grid-template-columns:auto 1fr;gap:8px}
 .qarow .datebtn{width:auto}
@@ -535,8 +538,8 @@ function quickAdd(){
   return `<div class="qa">
     <div class="seg">${[['expense','지출'],['income','수입'],['saving','저축']].map(([k,l])=>`<button class="${ty===k?'on':''}" data-act="qatype" data-v="${k}">${l}</button>`).join('')}</div>
     <label class="amount sm"><input id="qa-amount" inputmode="numeric" autocomplete="off" placeholder="${ph}" value="${q.amount?won(Number(q.amount)):''}" aria-label="금액"><span>원</span></label>
-    ${cats}
-    ${ty!=='saving'?`<div class="chips">${chipsHTML(ms,q.method,'qamethod')}<button class="chip ghost" data-act="newMethod">＋ 카드 추가</button></div>`:''}
+    <div class="qagroup"><div class="qalab">${ty==='saving'?'통장':'분류'}</div>${cats}</div>
+    ${ty!=='saving'?`<div class="qagroup"><div class="qalab">결제수단</div><div class="chips">${chipsHTML(ms,q.method,'qamethod')}</div></div>`:''}
     ${ty==='income'&&q.cat===CASHBACK?'<p class="hint">캐시백이 나온 카드를 결제수단으로 고르면 카드 탭에서 실제 부담이 계산돼요.</p>':''}
     <div class="qarow">${dateField('qa-date',qaDate(),{label:'날짜'})}<input class="input" id="qa-memo" list="memos" autocomplete="off" placeholder="메모 (선택)" value="${esc(q.memo)}"></div>
     <button class="btn primary block" data-act="qaSave">적기</button>
