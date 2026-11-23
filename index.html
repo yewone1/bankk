@@ -686,7 +686,8 @@ function viewCards(){
     if(!used.length&&!cb.length&&m.k!=='credit')return;
     any=true;
     const u=sum(used),c=sum(cb),done=used.filter(t=>t.checked).length;
-    const noCheck=m.k==='bank'||m.n==='계좌이체';   // 계좌이체는 맞춰 볼 카드 명세서가 없어요
+    // 현금·계좌이체는 맞춰 볼 명세서도, 캐시백도 없어요
+    const noCheck=m.k==='bank'||m.k==='cash'||m.n==='계좌이체'||m.n==='현금';
     const key=m.n||'_none';const open=!!S.open[key];
     const name=m.n||'결제수단 미지정';
     h+=`<section class="card method"><button class="mhead" data-act="toggleM" data-k="${esc(key)}" aria-expanded="${open}">
@@ -694,8 +695,8 @@ function viewCards(){
       <span class="hint">${open?'접기':'내역 보기'}</span></button>
       ${payLine(m)}
       <div class="mstats"><div><div class="k">사용 ${used.length}건</div><div class="v num">${won(u)}</div></div>
-      <div><div class="k">캐시백</div><div class="v num pos">${c?'+'+won(c):'–'}</div></div>
-      <div><div class="k">실제 부담</div><div class="v num">${won(u-c)}</div></div></div>
+      ${noCheck?'':`<div><div class="k">캐시백</div><div class="v num pos">${c?'+'+won(c):'–'}</div></div>
+      <div><div class="k">실제 부담</div><div class="v num">${won(u-c)}</div></div>`}</div>
       ${used.length&&!noCheck?`<div class="progress" title="명세서 확인"><i style="width:${done/used.length*100}%"></i></div><div class="hint" style="margin-top:6px">명세서 확인 ${done}/${used.length}</div>`:''}
       ${open?`<div class="mlist">${[...used,...cb].sort((a,b)=>a.date<b.date?-1:1).map(t=>{
         const isCb=t.type==='income';
