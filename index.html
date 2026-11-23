@@ -500,18 +500,21 @@ async function autoRecord(){
 function fixedCard(all){
   const items=[...S.fixed].sort((a,b)=>(Number(a.day)||0)-(Number(b.day)||0));
   if(!items.length)return `<section class="card"><h2>고정비</h2><p class="hint" style="font-size:14px">월세, 통신비, 보험처럼 매달 나가는 돈을 등록해 두면, 그 날짜가 지나면 이번 달 내역에 알아서 적혀요.</p><button class="btn" style="margin-top:10px" data-act="newFixed">＋ 고정비 등록</button></section>`;
-  const p=ym(S.y,S.m);let paid=0,left=0;
+  const p=ym(S.y,S.m);let paid=0,left=0,unknown=0;
   const rows=items.map(f=>{
     const tx=fixedMatch(f,all),skipped=!tx&&(f.skip||[]).includes(p);
-    if(tx)paid++;else if(!skipped)left+=Number(f.amount)||0;
+    const variable=!Number(f.amount);   // 금액을 비워 등록 = 매달 금액이 달라서 직접 확인
+    if(tx)paid++;else if(!skipped){if(variable)unknown++;else left+=Number(f.amount);}
     const name=esc(f.name||f.cat),method=esc(f.method||'결제수단 미지정');
     let st,sub;
     if(tx){st=`<button class="stat done" data-act="edit" data-id="${tx.id}" aria-label="${name} 냄, 고치기" title="냄">✓</button>`;sub=`${Number(tx.date.slice(5,7))}/${Number(tx.date.slice(8,10))} 냄 · ${esc(tx.method||f.method||'결제수단 미지정')}`;}
     else if(skipped){st=`<button class="stat" data-act="payFixed" data-id="${f.id}" aria-label="${name} 이번 달 건너뜀, 냈으면 누르기" title="이번 달 건너뜀">⏭️</button>`;sub=`이번 달 건너뜀 · ${method}`;}
-    else{st=`<button class="stat" data-act="payFixed" data-id="${f.id}" aria-label="${name} ${esc(f.day)}일 예정, 냈으면 누르기" title="예정">⏳</button>`;sub=`매달 ${esc(f.day)}일 · ${method}`;}
-    return `<div class="frow"><button class="fmain" data-act="editFixed" data-id="${f.id}"><span class="t1">${name}</span><span class="hint">${sub}</span></button><div class="fright"><span class="num" style="font-weight:600">${won(tx?tx.amount:f.amount)}</span>${st}</div></div>`;
+    else{st=`<button class="stat" data-act="payFixed" data-id="${f.id}" aria-label="${name} ${esc(f.day)}일 예정, 냈으면 누르기" title="예정">⏳</button>`;sub=`매달 ${esc(f.day)}일 · ${variable?'금액 매달 다름':method}`;}
+    const amt=tx?`${won(tx.amount)}`:variable?`<span class="hint" style="font-weight:500">금액 확인</span>`:won(f.amount);
+    return `<div class="frow"><button class="fmain" data-act="editFixed" data-id="${f.id}"><span class="t1">${name}</span><span class="hint">${sub}</span></button><div class="fright"><span class="num" style="font-weight:600">${amt}</span>${st}</div></div>`;
   }).join('');
-  return `<section class="card"><h2>고정비 <span class="sub">· ${items.length}개 중 ${paid}개 냄${left?` · 남은 ${won(left)}원`:''}</span></h2>${rows}<button class="btn" style="margin-top:12px" data-act="newFixed">＋ 고정비 등록</button></section>`;
+  const rest=[left?`남은 ${won(left)}원`:'',unknown?`금액 확인 ${unknown}개`:''].filter(Boolean).join(' + ');
+  return `<section class="card"><h2>고정비 <span class="sub">· ${items.length}개 중 ${paid}개 냄${rest?` · ${rest}`:''}</span></h2>${rows}<button class="btn" style="margin-top:12px" data-act="newFixed">＋ 고정비 등록</button></section>`;
 }
 function freqCats(){
   const cnt={};S.txs.filter(t=>t.type==='expense').forEach(t=>cnt[t.cat]=(cnt[t.cat]||0)+1);
@@ -826,7 +829,7 @@ function renderSheet(){
     const ms=S.cfg.methods.map(m=>m.n);if(F.method&&!ms.includes(F.method))ms.push(F.method);
     inner=`<div class="sheethead"><h3>${esc(f.name||f.cat)} 냈어요</h3><button class="iconbtn" data-act="close" aria-label="닫기">${I.close}</button></div>
     <p class="hint">언제, 얼마 냈는지 확인하고 저장하세요. 다르면 여기서 바꾸면 돼요.</p>
-    <label class="amount"><input id="p-amount" inputmode="numeric" autocomplete="off" value="${F.amount?won(Number(F.amount)):''}" aria-label="금액"><span>원</span></label>
+    <label class="amount"><input id="p-amount" inputmode="numeric" autocomplete="off" placeholder="실제 낸 금액" value="${F.amount?won(Number(F.amount)):''}" aria-label="금액"><span>원</span></label>
     <div class="field"><span class="lab">낸 날</span>${dateField('p-date',F.date,{label:'낸 날'})}</div>
     <div class="field"><span class="lab">결제수단</span><div class="chips">${chipsHTML(ms,F.method,'pmethod')}</div></div>
     <button class="btn primary block" data-act="savePay">저장</button>`;
@@ -835,11 +838,12 @@ function renderSheet(){
     const ms=S.cfg.methods.map(m=>m.n);if(F.method&&!ms.includes(F.method))ms.push(F.method);
     inner=`<div class="sheethead"><h3>${F.id?'고정비 고치기':'고정비 등록'}</h3><button class="iconbtn" data-act="close" aria-label="닫기">${I.close}</button></div>
     <div class="field"><label for="x-name">이름</label><input class="input" id="x-name" value="${esc(F.name)}" placeholder="예: 월세, SKT, 넷플릭스"></div>
-    <label class="amount"><input id="x-amount" inputmode="numeric" autocomplete="off" placeholder="0" value="${F.amount?won(F.amount):''}" aria-label="금액"><span>원</span></label>
+    <label class="amount"><input id="x-amount" inputmode="numeric" autocomplete="off" placeholder="매달 다르면 비워 두기" value="${Number(F.amount)?won(F.amount):''}" aria-label="금액"><span>원</span></label>
     <div class="field"><span class="lab">분류</span><div class="chips">${chipsHTML(fx,F.cat,'xcat','fix')}</div></div>
     <div class="field"><span class="lab">결제수단</span><div class="chips">${chipsHTML(ms,F.method,'xmethod')}</div></div>
     <div class="field"><label for="x-day">매달 며칠에 나가요?</label><input class="input" id="x-day" type="number" min="1" max="31" inputmode="numeric" value="${esc(F.day||'')}" placeholder="예: 25 (말일이면 31)"></div>
-    <p class="hint">그 날짜가 지나면 이번 달 내역에 알아서 적혀요. 이번 달만 금액이 다르면 적힌 내역을 눌러 고치세요. 이번 달에 안 냈으면 그 내역을 지우면 이번 달은 건너뛰어요.</p>
+    <p class="hint">금액을 적어 두면 그 날짜가 지나면 이번 달 내역에 알아서 적혀요. 이번 달만 금액이 다르면 적힌 내역을 눌러 고치세요.</p>
+    <p class="hint">도시가스·전기세처럼 금액이 매달 다르면 <b>금액을 비워 두세요.</b> 알아서 적지 않고 ⏳로 남아 있다가, 출금 문자를 보고 ⏳를 눌러 실제 금액을 넣으면 돼요.</p>
     <button class="btn primary block" data-act="saveFixed">저장</button>
     ${F.id?`<button class="btn danger block ${F.armed?'armed':''}" data-act="delFixed">${F.armed?'한 번 더 누르면 지워져요':'이 고정비 그만 내요 (지우기)'}</button><p class="hint">지워도 이미 적힌 지난 내역은 남아요.</p>`:''}`;
   }else if(F.mode==='accView'){
@@ -1002,10 +1006,9 @@ document.addEventListener('click',async e=>{
     case 'xmethod':readFixedInputs();F.method=F.method===el.dataset.v?'':el.dataset.v;renderSheet();break;
     case 'saveFixed':{
       readFixedInputs();
-      if(!Number(F.amount)){toast('금액을 적어 주세요.');return;}
       if(!F.cat){toast('분류를 골라 주세요.');return;}
       if(!F.day){toast('매달 며칠에 나가는지 적어 주세요.');return;}
-      const doc={name:F.name||F.cat,cat:F.cat,amount:Number(F.amount),method:F.method||'',day:Number(F.day),since:F.since||ym(now.getFullYear(),now.getMonth()+1),skip:F.skip||[]};
+      const doc={name:F.name||F.cat,cat:F.cat,amount:Number(F.amount)||0,method:F.method||'',day:Number(F.day),since:F.since||ym(now.getFullYear(),now.getMonth()+1),skip:F.skip||[]};
       if(F.sample)doc.sample=true;
       const id=F.id;closeSheet();
       put('fixed',{id:id||newId(),...doc});toast('저장했어요');
