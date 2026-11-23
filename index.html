@@ -596,17 +596,15 @@ function fixedCard(all){
   const rest=[left?`남은 ${won(left)}원`:'',unknown?`금액 확인 ${unknown}개`:''].filter(Boolean).join(' + ');
   return `<section class="card"><button class="fhead" data-act="toggleFixed" aria-expanded="${S.fixedOpen}"><h2>고정비 <span class="sub">· ${items.length}개 중 ${paid}개 냄${rest?` · ${rest}`:''}</span></h2><span class="chev ${S.fixedOpen?'open':''}">${I.next}</span></button>${S.fixedOpen?`<div class="fbody">${rows}<button class="btn" style="margin-top:12px" data-act="newFixed">＋ 고정비 등록</button></div>`:''}</section>`;
 }
-function freqCats(){
-  const cnt={};S.txs.filter(t=>t.type==='expense').forEach(t=>cnt[t.cat]=(cnt[t.cat]||0)+1);
-  const names=S.cfg.expenseCats.filter(c=>c.g!=='fixed').map(c=>c.n);
-  return [...names].sort((a,b)=>(cnt[b]||0)-(cnt[a]||0)||names.indexOf(a)-names.indexOf(b));
+function varCats(){
+  return S.cfg.expenseCats.filter(c=>c.g!=='fixed').map(c=>c.n);
 }
 function qaDate(){const isNow=S.y===now.getFullYear()&&S.m===now.getMonth()+1;return S.qa.date||(isNow?today():`${ym(S.y,S.m)}-01`);}
 function quickAdd(){
   const q=S.qa,ty=q.type;
   let cats='';
   if(ty==='expense'){
-    const vc=freqCats(),fx=S.cfg.expenseCats.filter(c=>c.g==='fixed').map(c=>c.n);
+    const vc=varCats(),fx=S.cfg.expenseCats.filter(c=>c.g==='fixed').map(c=>c.n);
     let shown=S.qaMore?vc:vc.slice(0,8);
     if(q.cat&&!shown.includes(q.cat)&&!fx.includes(q.cat))shown=[...shown,q.cat];
     cats=`<div class="chips">${chipsHTML(shown,q.cat,'qacat','var')}${S.qaMore||fx.includes(q.cat)?chipsHTML(fx,q.cat,'qacat','fix'):''}<button class="chip ghost" data-act="qamore">${S.qaMore?'접기':'더보기'}</button></div>`;
