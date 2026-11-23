@@ -582,8 +582,8 @@ function quickAdd(){
     <div class="seg">${[['expense','지출'],['income','수입'],['saving','저축']].map(([k,l])=>`<button class="${ty===k?'on':''}" data-act="qatype" data-v="${k}">${l}</button>`).join('')}</div>
     <label class="amount sm"><input id="qa-amount" inputmode="numeric" autocomplete="off" placeholder="${ph}" value="${q.amount?won(Number(q.amount)):''}" aria-label="금액"><span>원</span></label>
     <div class="qagroup"><div class="qalab">${ty==='saving'?'통장':'분류'}</div>${cats}</div>
-    ${ty!=='saving'?`<div class="qagroup"><div class="qalab">결제수단</div><div class="chips">${chipsHTML(ms,q.method,'qamethod')}</div></div>`:''}
-    ${ty==='income'&&q.cat===CASHBACK?'<p class="hint">캐시백이 나온 카드를 결제수단으로 고르면 카드 탭에서 실제 부담이 계산돼요.</p>':''}
+    ${ty==='expense'?`<div class="qagroup"><div class="qalab">결제수단</div><div class="chips">${chipsHTML(ms,q.method,'qamethod')}</div></div>`:''}
+    ${ty==='income'&&q.cat===CASHBACK?`<div class="qagroup"><div class="qalab">어느 카드 캐시백이에요?</div><div class="chips">${chipsHTML(ms,q.method,'qamethod')}</div><p class="hint">카드를 고르면 카드 탭에서 실제 부담이 계산돼요.</p></div>`:''}
     <div class="qarow">${dateField('qa-date',qaDate(),{label:'날짜'})}<input class="input" id="qa-memo" list="memos" autocomplete="off" placeholder="메모 (선택)" value="${esc(q.memo)}"></div>
     <button class="btn primary block" data-act="qaSave">적기</button>
   </div>`;
@@ -836,7 +836,7 @@ function renderSheet(){
     ${F.id?'':`<div class="seg">${[['expense','지출'],['income','수입'],['saving','저축']].map(([k,l])=>`<button class="${ty===k?'on':''}" data-act="ftype" data-v="${k}">${l}</button>`).join('')}</div>`}
     <label class="amount"><input id="f-amount" inputmode="numeric" autocomplete="off" placeholder="0" value="${F.amount?won(Number(F.amount)):''}" aria-label="금액"><span>원</span></label>
     <div class="field"><span class="lab">${ty==='saving'?'어느 통장에':'분류'}</span>${catBlock}</div>
-    <div class="field"><span class="lab">결제수단</span><div class="chips">${chipsHTML(ms,F.method,'fmethod')}</div></div>
+    ${ty==='expense'||(ty==='income'&&F.cat===CASHBACK)?`<div class="field"><span class="lab">${ty==='income'?'어느 카드 캐시백이에요?':'결제수단'}</span><div class="chips">${chipsHTML(ms,F.method,'fmethod')}</div></div>`:''}
     <div class="row2"><div class="field"><span class="lab">날짜</span>${dateField('f-date',F.date,{label:'날짜'})}</div>
     <div class="field"><label for="f-memo">메모</label><input class="input" id="f-memo" list="memos" autocomplete="off" placeholder="${ty==='expense'?'예: 점심 김밥':'메모'}" value="${esc(F.memo)}"></div></div>
     <button class="btn primary block" data-act="saveTx">저장</button>`;
@@ -990,7 +990,7 @@ document.addEventListener('click',async e=>{
       if(!F.date){toast('날짜를 골라 주세요.');return;}
       if(F.type==='saving'&&!F.accountId){toast('어느 통장에 넣었는지 골라 주세요.');return;}
       if(F.type!=='saving'&&!F.cat){toast('분류를 골라 주세요.');return;}
-      const doc={date:F.date,type:F.type,cat:F.type==='saving'?accName(F.accountId):F.cat,memo:F.memo.trim(),method:F.method,amount,createdAt:F.createdAt||Date.now()};
+      const doc={date:F.date,type:F.type,cat:F.type==='saving'?accName(F.accountId):F.cat,memo:F.memo.trim(),method:F.type==='income'&&F.cat!==CASHBACK?'':F.method,amount,createdAt:F.createdAt||Date.now()};
       if(F.type==='saving')doc.accountId=F.accountId;
       if(F.checked)doc.checked=true;
       if(F.fixedId&&F.type==='expense')doc.fixedId=F.fixedId;
@@ -1032,7 +1032,7 @@ document.addEventListener('click',async e=>{
       if(q.type!=='saving'&&!q.cat){toast('분류를 골라 주세요.');return;}
       const date=qaDate();
       const bank=(S.cfg.methods.find(x=>x.k==='bank')||{}).n||'';
-      const doc={date,type:q.type,cat:q.type==='saving'?accName(q.accountId):q.cat,memo:(q.memo||'').trim(),method:q.type==='saving'?bank:(q.method||''),amount,createdAt:Date.now()};
+      const doc={date,type:q.type,cat:q.type==='saving'?accName(q.accountId):q.cat,memo:(q.memo||'').trim(),method:q.type==='saving'?bank:q.type==='income'&&q.cat!==CASHBACK?'':(q.method||''),amount,createdAt:Date.now()};
       if(q.type==='saving')doc.accountId=q.accountId;
       if(q.type==='expense'){lastM=q.method;rememberMethod(q.method);}
       S.qa={...q,amount:'',cat:'',accountId:'',memo:''};
