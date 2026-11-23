@@ -19,7 +19,7 @@
 :root{
   --bg:#F1F4F3; --surface:#FFFFFF; --sunk:#E7ECEA; --ink:#15201D; --muted:#5D6A66; --line:#D9E0DD;
   --accent:#0D6B5B; --accent-ink:#FFFFFF; --accent-soft:#D9EEE8;
-  --c-inc:#2F3D39; --c-fix:#4C61AE; --c-var:#D38B22; --c-save:#0D8A73; --c-left:#AEB9B5; --neg:#C2453A; --pos:#0D7A64;
+  --c-inc:#2F3D39; --c-fix:#4C61AE; --c-var:#D38B22; --c-save:#7457B8; --c-left:#AEB9B5; --neg:#C2453A; --pos:#0D7A64;
   --f-body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --f-num:"Space Grotesk","IBM Plex Sans KR",system-ui,sans-serif;
   --r:14px;
@@ -27,12 +27,12 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0F1514; --surface:#18201E; --sunk:#202A27; --ink:#E5ECE9; --muted:#93A19C; --line:#2A3532;
   --accent:#4CC3A8; --accent-ink:#06201A; --accent-soft:#163A33;
-  --c-inc:#C8D3CF; --c-fix:#8C9DEB; --c-var:#EEB04E; --c-save:#4CC3A8; --c-left:#56635F; --neg:#F07B6C; --pos:#5FD0B4;
+  --c-inc:#C8D3CF; --c-fix:#8C9DEB; --c-var:#EEB04E; --c-save:#A88CEB; --c-left:#56635F; --neg:#F07B6C; --pos:#5FD0B4;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0F1514; --surface:#18201E; --sunk:#202A27; --ink:#E5ECE9; --muted:#93A19C; --line:#2A3532;
   --accent:#4CC3A8; --accent-ink:#06201A; --accent-soft:#163A33;
-  --c-inc:#C8D3CF; --c-fix:#8C9DEB; --c-var:#EEB04E; --c-save:#4CC3A8; --c-left:#56635F; --neg:#F07B6C; --pos:#5FD0B4;
+  --c-inc:#C8D3CF; --c-fix:#8C9DEB; --c-var:#EEB04E; --c-save:#A88CEB; --c-left:#56635F; --neg:#F07B6C; --pos:#5FD0B4;
   color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -483,13 +483,23 @@ function viewFlow(){
   return h;
 }
 
+// 배지 글자: 기호·괄호는 빼고, 3글자까지는 한 줄, 4글자 이상은 2글자씩 두 줄 (예: 청년도약계좌 → 청년/도약)
+function badgeText(label){
+  const raw=String(label||'').replace(/\(.*?\)/g,'');
+  const clean=raw.replace(/[^\p{L}\p{N}]/gu,'');
+  if(/^[A-Za-z0-9]+$/.test(clean)||clean.length<=3){
+    const word=(raw.trim().split(/\s+/)[0]||clean).replace(/[^\p{L}\p{N}]/gu,'');
+    return esc((word.length<=4?word:clean).slice(0,4));
+  }
+  return `${esc(clean.slice(0,2))}<br>${esc(clean.slice(2,4))}`;
+}
 function itemRow(t){
   const label=t.type==='saving'?(accName(t.accountId)||t.cat):t.cat;
   const sign=t.type==='income'?'+':'−';
   const cls=t.type==='income'?'pos':'';
   const sub=[t.type==='saving'?'저축·투자':esc(label),t.method?esc(t.method):''].filter(Boolean).join(' · ');
   return `<button class="item" data-act="edit" data-id="${t.id}">
-    <span class="badge" style="background:${colorOf(t)}">${esc(String(label).slice(0,4))}</span>
+    <span class="badge" style="background:${colorOf(t)}">${badgeText(label)}</span>
     <span class="main"><div class="t1">${esc(t.memo||label)}</div><div class="t2">${sub}</div></span>
     <span class="amt num ${cls}">${sign}${won(t.amount)}</span></button>`;
 }
@@ -540,7 +550,10 @@ function fixedCard(all){
   const p=ym(S.y,S.m);let paid=0,left=0,unknown=0;
   // 정렬: 아직 안 낸 것(⏳) → 이번 달 건너뜀(⏭️) → 낸 것(✓), 각각 날짜 순
   const rank=f=>fixedMatch(f,all)?2:(f.skip||[]).includes(p)?1:0;
-  items.sort((a,b)=>rank(a)-rank(b)||(Number(a.day)||0)-(Number(b.day)||0));
+  // 낸 것(✓)은 주거비 → 통신비 → 그 밖 → 보험 순, 같은 묶음 안에서는 금액 큰 순
+  const catRank=f=>{const c=(f.cat||'')+' '+(f.name||'');return /월세|주거|관리비|공과금|전기|가스|수도/.test(c)?0:/통신|휴대폰|인터넷|SKT|KT|LG/.test(c)?1:/보험/.test(c)?3:2;};
+  const paidAmt=f=>{const t=fixedMatch(f,all);return t?Number(t.amount)||0:Number(f.amount)||0;};
+  items.sort((a,b)=>rank(a)-rank(b)||(rank(a)===2?(catRank(a)-catRank(b)||paidAmt(b)-paidAmt(a)):(Number(a.day)||0)-(Number(b.day)||0)));
   const rows=items.map(f=>{
     const tx=fixedMatch(f,all),skipped=!tx&&(f.skip||[]).includes(p);
     const variable=!Number(f.amount);   // 금액을 비워 등록 = 매달 금액이 달라서 직접 확인
