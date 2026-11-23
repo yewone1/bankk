@@ -145,6 +145,8 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .mini span{display:inline-flex;align-items:center;gap:5px}
 .mini b{color:var(--ink);font-weight:600}
 .qa{display:flex;flex-direction:column;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.payline{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;margin-top:10px;padding:10px 12px;border:0;border-radius:12px;background:var(--sunk);text-align:left;font-size:14px;color:var(--ink)}
+.payline span{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .fhead{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;border:0;background:transparent;padding:0;text-align:left;color:inherit}
 .fhead h2{margin:0}
 .chev svg{width:18px;height:18px;color:var(--muted);display:block}
@@ -656,6 +658,26 @@ function methodsAll(){
   monthTx().forEach(t=>{const n=t.method||'';if(!ms.find(m=>m.n===n))ms.push({n,k:''});});
   return ms;
 }
+// 신용카드 다음 결제일과 그때 나갈 대략적인 금액 (결제 전달 1일~말일 사용분 기준)
+function cardPay(m){
+  const day=Number(m.payDay);if(!day)return null;
+  const t0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  let y=t0.getFullYear(),mo=t0.getMonth()+1;
+  if(t0.getDate()>Math.min(day,daysIn(y,mo))){mo++;if(mo>12){mo=1;y++;}}
+  const date=`${ym(y,mo)}-${pad(Math.min(day,daysIn(y,mo)))}`;
+  let uy=y,um=mo-1;if(um<1){um=12;uy--;}
+  const p=ym(uy,um);
+  const amt=sum(S.txs.filter(t=>t.type==='expense'&&(t.method||'')===m.n&&(t.date||'').startsWith(p)));
+  return {date,um,amt};
+}
+function payLine(m){
+  if(m.k!=='credit')return '';
+  const cp=cardPay(m);
+  if(!cp)return `<button class="btn" style="margin-top:10px;font-size:13px;padding:7px 12px" data-act="setPayDay" data-n="${esc(m.n)}">＋ 결제일 적기</button>`;
+  return `<button class="payline" data-act="setPayDay" data-n="${esc(m.n)}" aria-label="결제일 바꾸기">
+    <span>매달 ${m.payDay}일 결제 · 다음 <b class="num">${Number(cp.date.slice(5,7))}/${Number(cp.date.slice(8,10))}</b> ${ddayChip(cp.date)}</span>
+    <span class="hint">${cp.um}월 사용분 약 <b class="num" style="color:var(--ink)">${won(cp.amt)}원</b></span></button>`;
+}
 function viewCards(){
   const list=monthTx();
   let h=`<p class="hint">결제수단별로 이번 달 사용액과 캐시백을 모아 봐요. 카드 명세서와 맞춰 보면서 하나씩 체크하세요.</p>`;
@@ -663,7 +685,7 @@ function viewCards(){
   methodsAll().forEach(m=>{
     const used=list.filter(t=>t.type==='expense'&&(t.method||'')===m.n);
     const cb=list.filter(t=>t.type==='income'&&t.cat===CASHBACK&&(t.method||'')===m.n);
-    if(!used.length&&!cb.length)return;
+    if(!used.length&&!cb.length&&m.k!=='credit')return;
     any=true;
     const u=sum(used),c=sum(cb),done=used.filter(t=>t.checked).length;
     const key=m.n||'_none';const open=!!S.open[key];
@@ -671,6 +693,7 @@ function viewCards(){
     h+=`<section class="card method"><button class="mhead" data-act="toggleM" data-k="${esc(key)}" aria-expanded="${open}">
       <span class="mname">${esc(name)}${m.k?`<span class="kind">${KIND_LABEL[m.k]||''}</span>`:''}</span>
       <span class="hint">${open?'접기':'내역 보기'}</span></button>
+      ${payLine(m)}
       <div class="mstats"><div><div class="k">사용 ${used.length}건</div><div class="v num">${won(u)}</div></div>
       <div><div class="k">캐시백</div><div class="v num pos">${c?'+'+won(c):'–'}</div></div>
       <div><div class="k">실제 부담</div><div class="v num">${won(u-c)}</div></div></div>
@@ -896,6 +919,12 @@ function renderSheet(){
     <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="a-closed" ${F.closed?'checked':''}> 만기·해지로 끝난 계좌</label>
     <button class="btn primary block" data-act="saveAcc">저장</button>
     ${F.id?`<button class="btn danger block ${F.armed?'armed':''}" data-act="delAcc">${F.armed?'한 번 더 누르면 지워져요':'이 통장 지우기'}</button><p class="hint">통장을 지워도 저축 내역은 남아요.</p>`:''}`;
+  }else if(F.mode==='payDay'){
+    inner=`<div class="sheethead"><h3>${esc(F.name)} 결제일</h3><button class="iconbtn" data-act="close" aria-label="닫기">${I.close}</button></div>
+    <div class="field"><label for="pd-day">매달 며칠에 카드값이 빠져나가요?</label><input class="input" id="pd-day" type="number" min="1" max="31" inputmode="numeric" value="${esc(F.day||'')}" placeholder="예: 14"></div>
+    <p class="hint">카드 탭에 다음 결제일과, 전달 1일~말일에 이 카드로 쓴 금액이 보여요. 카드마다 이용 기간이 조금씩 달라서 실제 청구액과는 차이가 날 수 있어요.</p>
+    <p class="hint">카드값이 빠져나가는 건 가계부에 따로 적지 않아요. 쓸 때마다 이미 지출로 적었으니까요.</p>
+    <div class="row2"><button class="btn primary" data-act="savePayDay">저장</button>${F.day?'<button class="btn" data-act="clearPayDay">결제일 지우기</button>':'<span></span>'}</div>`;
   }else if(F.mode==='newMethod'){
     inner=`<div class="sheethead"><h3>카드·결제수단 추가</h3><button class="iconbtn" data-act="close" aria-label="닫기">${I.close}</button></div>
     <div class="field"><label for="m-name">이름</label><input class="input" id="m-name" value="${esc(F.name)}" placeholder="예: 신한 Deep Dream, 현대카드 M"></div>
@@ -945,7 +974,7 @@ function renderSheet(){
     const fx=c.expenseCats.map((x,i)=>({x,i})).filter(o=>o.x.g==='fixed'),vr=c.expenseCats.map((x,i)=>({x,i})).filter(o=>o.x.g!=='fixed');
     const ec=a=>a.map(o=>`<span class="chip">${esc(o.x.n)}<button data-act="rmItem" data-kind="exp" data-i="${o.i}" aria-label="지우기">×</button></span>`).join('');
     inner=`<div class="sheethead"><h3>설정</h3><button class="iconbtn" data-act="close" aria-label="닫기">${I.close}</button></div>
-    <section class="card"><h2>결제수단</h2><div class="setlist">${c.methods.map((m,i)=>`<span class="chip">${esc(m.n)} <small class="hint">${KIND_LABEL[m.k]||''}</small><button data-act="rmItem" data-kind="method" data-i="${i}" aria-label="지우기">×</button></span>`).join('')}</div>
+    <section class="card"><h2>결제수단</h2><div class="setlist">${c.methods.map((m,i)=>`<span class="chip">${esc(m.n)} <small class="hint">${KIND_LABEL[m.k]||''}${m.payDay?` · ${m.payDay}일 결제`:''}</small><button data-act="rmItem" data-kind="method" data-i="${i}" aria-label="지우기">×</button></span>`).join('')}</div>
       <div class="addrow" style="margin-top:10px"><input class="input" id="s-method" placeholder="예: 신한 Deep Dream"><select class="input" id="s-mkind" style="flex:0 0 96px">${Object.entries(KIND_LABEL).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div>
       <button class="btn" style="margin-top:8px" data-act="addMethod">추가</button>
       <p class="hint" style="margin-top:8px">실제 카드 이름으로 적어 두면 카드 탭에서 명세서와 맞춰 보기 쉬워요.</p></section>
@@ -1189,6 +1218,17 @@ document.addEventListener('click',async e=>{
       try{localStorage.removeItem(CONF_KEY);localStorage.removeItem(CACHE_KEY);}catch(e){}
       S.setupUrl=CONF&&CONF.url||'';CONF=null;closeSheet();
       S.status='setup';S.db=null;S.setupErr='';S.txs=[];S.accounts=[];S.fixed=[];render();
+      break;}
+    case 'setPayDay':{
+      const m=S.cfg.methods.find(x=>x.n===el.dataset.n);if(!m)return;
+      F={mode:'payDay',name:m.n,day:m.payDay||''};renderSheet();
+      setTimeout(()=>{const e=$('#pd-day');if(e)e.focus();},50);break;}
+    case 'savePayDay':case 'clearPayDay':{
+      const day=act==='clearPayDay'?0:Math.min(31,Math.max(0,Number(($('#pd-day')||{}).value)||0));
+      if(act==='savePayDay'&&!day){toast('1~31 사이 날짜를 적어 주세요.');return;}
+      const name=F.name;closeSheet();
+      saveCfg({...S.cfg,methods:S.cfg.methods.map(m=>{if(m.n!==name)return m;const o={...m};if(day)o.payDay=day;else delete o.payDay;return o;})});
+      toast(day?`${name} 결제일을 매달 ${day}일로 적었어요`:`${name} 결제일을 지웠어요`);
       break;}
     case 'newMethod':F={mode:'newMethod',name:'',kind:'credit'};renderSheet();setTimeout(()=>{const e=$('#m-name');if(e)e.focus();},50);break;
     case 'mkind':{const e=$('#m-name');if(e)F.name=e.value;F.kind=el.dataset.v;renderSheet();break;}
